@@ -1,10 +1,10 @@
 package dev.term4;
 
-import dev.term4.minestommechanics.MinestomMechanics;
-import dev.term4.minestommechanics.mechanics.combat.Combat;
-import dev.term4.minestommechanics.mechanics.damage.DamageConfig;
-import dev.term4.minestommechanics.mechanics.damage.DamageSystem;
-import dev.term4.minestommechanics.mechanics.knockback.KnockbackSystem;
+import io.github.Term4.minestommechanics.MinestomMechanics;
+import io.github.Term4.minestommechanics.mechanics.combat.Combat;
+import io.github.Term4.minestommechanics.mechanics.damage.DamageConfig;
+import io.github.Term4.minestommechanics.mechanics.damage.DamageSystem;
+import io.github.Term4.minestommechanics.mechanics.knockback.KnockbackSystem;
 import net.minestom.server.Auth;
 import net.minestom.server.MinecraftServer;
 import net.minestom.server.coordinate.Pos;

@@ -31,7 +31,7 @@ mavenPublishing {
             developer {
                 name = "Term4"
                 id = "Term4"
-//                email = "mudkip@mudkip.dev"
+                email = "gptkc2003@gmail.com"
                 url = "https://github.com/Term4"
             }
         }
