@@ -1,5 +1,6 @@
 package io.github.term4.minestommechanics;
 
+import io.github.term4.minestommechanics.mechanics.attack.AttackSystem;
 import io.github.term4.minestommechanics.mechanics.knockback.KnockbackSystem;
 import io.github.term4.minestommechanics.mechanics.damage.DamageSystem;
 import io.github.term4.minestommechanics.platform.client.ClientInfoService;
@@ -11,6 +12,7 @@ import net.minestom.server.MinecraftServer;
 import net.minestom.server.event.Event;
 import net.minestom.server.event.EventNode;
 import net.minestom.server.event.player.PlayerDisconnectEvent;
+import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 public final class MinestomMechanics {
@@ -26,24 +28,27 @@ public final class MinestomMechanics {
     public boolean installSprintTracker = true;
 
     // might add an option for packet validation when not using a proxy? probably better to use a separate library for that though
-    private final EventNode<Event> root = EventNode.all("mm:root");
-    private final EventNode<Event> apiEvents = EventNode.all("mm:api-events");
+    private final EventNode<@NotNull Event> root = EventNode.all("mm:root");
+    private final EventNode<@NotNull Event> apiEvents = EventNode.all("mm:api-events");
 
     // Server level services
     private ClientInfoService clientInfo;
 
     // Optional registry
-    private @Nullable DamageSystem damageSystem;
-    private @Nullable KnockbackSystem knockbackSystem;
     private @Nullable SprintTracker sprintTracker;
+    private @Nullable AttackSystem attackSystem;
+    private @Nullable KnockbackSystem knockbackSystem;
+    private @Nullable DamageSystem damageSystem;
 
-    public void registerDamage(DamageSystem d) { damageSystem = d; }
-    public void registerKnockback(KnockbackSystem k) { knockbackSystem = k; }
     void registerSprintTracker(SprintTracker s) { sprintTracker = s; }
+    public void registerAttack(AttackSystem a) { attackSystem = a; }
+    public void registerKnockback(KnockbackSystem k) { knockbackSystem = k; }
+    public void registerDamage(DamageSystem d) { damageSystem = d; }
 
-    public @Nullable DamageSystem damageSystem() { return damageSystem; }
-    public @Nullable KnockbackSystem knockbackSystem() { return knockbackSystem; }
     public @Nullable SprintTracker sprintTracker() { return sprintTracker; }
+    public @Nullable AttackSystem attackSystem() { return attackSystem; }
+    public @Nullable KnockbackSystem knockbackSystem() { return knockbackSystem; }
+    public @Nullable DamageSystem damageSystem() { return damageSystem; }
 
     private static final MinestomMechanics INSTANCE = new MinestomMechanics();
     private boolean initialized = false;
@@ -53,7 +58,7 @@ public final class MinestomMechanics {
     public static MinestomMechanics getInstance() { return INSTANCE; }
 
     /** Initialize with current options (or defaults if no options specified) */
-    public void initialize() {
+    public void init() {
         if (initialized) return;
         initialized = true;
 
@@ -73,7 +78,7 @@ public final class MinestomMechanics {
         MinecraftServer.getGlobalEventHandler().addChild(root);
 
         // Create child nodes
-        EventNode<Event> detectors = EventNode.all("mm:detectors");
+        EventNode<@NotNull Event> detectors = EventNode.all("mm:detectors");
 
         // Add child nodes to root
         root.addChild(detectors);
@@ -84,6 +89,12 @@ public final class MinestomMechanics {
         if (viaProxyDetails) detectors.addChild(VersionDetector.node(clientInfo));
     }
 
+    /** Access registered MinestomMechanics services. */
+    public Services services() {
+        if (!initialized) throw new IllegalStateException("MinestomMechanics has not been initialized");
+        return new Services(this);
+    }
+
     /** Access client info (e.g. protocol version) from server level detectors */
     public ClientInfoService clientInfo() {
         if (!initialized) throw new IllegalStateException("MinestomMechanics has not been initialized");
@@ -91,13 +102,13 @@ public final class MinestomMechanics {
     }
 
     /** Public node for MinestomMechanics API events */
-    public EventNode<Event> events() {
+    public EventNode<@NotNull Event> events() {
         if (!initialized) throw new IllegalStateException("MinestomMechanics has not been initialized");
         return apiEvents;
     }
 
     /** Public method to install a node to the root MinestomMechanics node */
-    public void install(EventNode<Event> node) {
+    public void install(EventNode<@NotNull Event> node) {
         if  (!initialized) throw new IllegalStateException("MinestomMechanics has not been initialized");
         root.addChild(node);
     }

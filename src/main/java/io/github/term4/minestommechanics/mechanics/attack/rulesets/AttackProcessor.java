@@ -1,7 +1,7 @@
-package io.github.term4.minestommechanics.mechanics.combat.attack.rulesets;
+package io.github.term4.minestommechanics.mechanics.attack.rulesets;
 
-import io.github.term4.minestommechanics.mechanics.combat.attack.AttackServices;
-import io.github.term4.minestommechanics.mechanics.combat.attack.AttackSnapshot;
+import io.github.term4.minestommechanics.Services;
+import io.github.term4.minestommechanics.mechanics.attack.AttackSnapshot;
 
 /**
  * Responsible for processing attacks (or attempted attacks) from a player
@@ -16,14 +16,13 @@ public interface AttackProcessor {
      * Called when the server receives an attack packet (or an emulated attack).
      *
      * @param attack the snapshot of all relevant information at the time of the attack
-     * @param services services used in processing the attack
      */
-    void processAttack(AttackSnapshot attack, AttackServices services); // target is nullable for swing + raytraced emulated attacks
+    void processAttack(AttackSnapshot attack); // target is nullable for swing + raytraced emulated attacks
 
     // Ruleset
     @FunctionalInterface
     interface Ruleset {
-        AttackProcessor create(AttackServices services);
+        AttackProcessor create(Services services);
     }
 
     // Presets

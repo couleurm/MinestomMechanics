@@ -7,55 +7,77 @@ import net.minestom.server.entity.Player;
 import net.minestom.server.event.Event;
 import net.minestom.server.event.EventNode;
 import net.minestom.server.event.entity.EntityTeleportEvent;
-import net.minestom.server.event.player.PlayerTickEvent;
+import net.minestom.server.event.player.PlayerMoveEvent;
 import net.minestom.server.tag.Tag;
+import org.jetbrains.annotations.NotNull;
 
+// TODO: Update tick based values to use tps scaling (util class)
 /** Position delta velocity estimation for players. Minestom's getVelocity does not work for clients. */
 public final class VelocityEstimator {
 
-    private record Frame(Vec velocity, Pos lastPos) {}
+    private record Frame(Vec delta, Pos pos, long tick) {}
     private static final Tag<Frame> FRAME = Tag.Transient("mm:velocity-frame");
-    private static final Tag<Boolean> TELEPORTED = Tag.Transient("mm:velocity-teleported");
+    private static final Tag<Boolean> RESET = Tag.Transient("mm:velocity-reset");
+    private static final long GAP_TICKS = 6; // Ticks after which client assumed to be lag spiking (ignore first delta due to perceived teleport)
+    private static final long DECAY_TICKS = 3; // Ticks after which client is assumed stationary (velocity = 0)
 
     private VelocityEstimator() {}
 
-    /** Install the tick listener. */
-    public static void install(EventNode<Event> node) {
+    /** Install listeners for velocity estimation. */
+    public static void install(EventNode<@NotNull Event> node) {
 
-        // handles rare case where velocity is unpredictable due to teleportation
+        // Normal movement
+        node.addListener(PlayerMoveEvent.class, e -> {
+            onMove(e.getPlayer(), e.getNewPosition(), e.getPlayer().getAliveTicks());
+        });
+
+        // Teleport handling
         node.addListener(EntityTeleportEvent.class, e -> {
             if (e.getEntity() instanceof Player p) {
-                p.setTag(TELEPORTED, true);
+                reset(p, e.getNewPosition());
             }
         });
-
-        node.addListener(PlayerTickEvent.class, e -> {
-            Player player = e.getPlayer();
-            Pos current = player.getPosition();
-            Frame prev = player.getTag(FRAME);
-
-            Vec velocity;
-
-            if (Boolean.TRUE.equals(player.getTag(TELEPORTED))) {
-                player.removeTag(TELEPORTED);
-                velocity = Vec.ZERO;
-            } else if (prev != null) {
-                velocity = new Vec(current.x() - prev.lastPos().x(), current.y() - prev.lastPos().y(), current.z() - prev.lastPos().z());
-            }  else { velocity = Vec.ZERO; }
-
-            Frame frame = new Frame(velocity, current);
-            player.setTag(FRAME, frame);
-        });
     }
 
-    private static Vec get(Player player) {
-        Frame f = player.getTag(FRAME);
-        return f != null ? f.velocity() : Vec.ZERO;
+    public static void onMove(Player p, Pos pos, long tick) {
+        Frame prev = p.getTag(FRAME);
+        Vec delta;
+
+        if (Boolean.TRUE.equals(p.getTag(RESET))) {
+            p.removeTag(RESET);
+            delta = Vec.ZERO;
+        } else if (prev != null) {
+            long dt = tick - prev.tick();
+
+            if (dt > GAP_TICKS) {
+                delta = Vec.ZERO;
+            } else {
+                Pos last = prev.pos();
+                delta = new Vec(
+                        pos.x() - last.x(),
+                        pos.y() - last.y(),
+                        pos.z() - last.z()
+                );
+            }
+        } else { delta = Vec.ZERO; }
+
+        p.setTag(FRAME, new Frame(delta, pos, tick));
     }
 
-    /** General velocity method for any entity (uses estimate for player) */
+    private static void reset(Player p, Pos newPos) {
+        p.setTag(RESET, true);
+        p.setTag(FRAME, new Frame(Vec.ZERO, newPos, p.getAliveTicks()));
+    }
+
+    private static Vec get(Player p) {
+        Frame f = p.getTag(FRAME);
+        if (f == null) return Vec.ZERO;
+
+        long now = p.getAliveTicks();
+        return (now - f.tick() > DECAY_TICKS) ? Vec.ZERO : f.delta();
+    }
+
     public static Vec getVelocity(Entity entity) {
         return entity instanceof Player p ? get(p) : entity.getVelocity();
     }
-
 }

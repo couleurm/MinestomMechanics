@@ -14,6 +14,9 @@ public final class KnockbackConfig {
     // Formula
     public KnockbackFormula knockbackFormula = KnockbackFormula.CLASSIC;
 
+    // Settings
+    public long sprintBuffer = 0; // This is separate from the AttackConfig sprint buffer
+
     // Strength
     public double horizontal = 0.4;
     public double vertical = 0.4;
@@ -68,6 +71,7 @@ public final class KnockbackConfig {
     public KnockbackConfig copy() {
         var c = new KnockbackConfig();
         c.knockbackFormula = knockbackFormula;
+        c.sprintBuffer = sprintBuffer;
         c.horizontal = horizontal;
         c.vertical = vertical;
         c.extraHorizontal = extraHorizontal;

@@ -42,12 +42,12 @@ public final class ClientInfoService {
 
     /**
      * Returns the player's protocol version from the ViaVersion proxy details.
-     *
+     * <p>
      * NOTE:
      * This value may return {@link #UNKNOWN_PROTOCOL} (-1) until the plugin
      * message is received from the proxy. That message is typically sent
      * shortly after login (not during the initial join events).
-     *
+     * <p>
      * Systems relying on the protocol version should handle the UNKNOWN case
      * or defer execution briefly after login.
      */

@@ -1,7 +1,8 @@
 package io.github.term4.minestommechanics.mechanics.knockback;
 
-import io.github.term4.minestommechanics.api.event.knockback.KnockbackEvent;
-import io.github.term4.minestommechanics.mechanics.combat.attack.AttackSnapshot;
+import io.github.term4.minestommechanics.Services;
+import io.github.term4.minestommechanics.mechanics.Cause;
+import io.github.term4.minestommechanics.util.SprintTracker;
 import io.github.term4.minestommechanics.util.VelocityEstimator;
 import net.minestom.server.ServerFlag;
 import net.minestom.server.coordinate.Point;
@@ -9,52 +10,59 @@ import net.minestom.server.coordinate.Pos;
 import net.minestom.server.coordinate.Vec;
 import net.minestom.server.entity.Entity;
 import net.minestom.server.entity.LivingEntity;
+import org.jetbrains.annotations.Nullable;
 
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.function.Supplier;
 
 public final class KnockbackCalculator {
 
+    private final Services services;
+
     private static final double MIN_DIST = 1e-6; // distance at which position delta direction is degenerate
     private final double tps = ServerFlag.SERVER_TICKS_PER_SECOND;
 
-    public Vec compute(AttackSnapshot snap, KnockbackConfig cfg, KnockbackEvent.Cause cause) {
+    public KnockbackCalculator(Services services) {
+        this.services = services;
+    }
 
-        boolean hasExtra = snap.sprint(); // Also true if snap.item has a knockback attribute (not implemented yet)
+    public @Nullable Vec compute(KnockbackSnapshot snap) {
 
-        // Add return or something for kbCause!!!
+        // Knockback Context
+        DirContext ctx = dirCtx(snap);
+        if (ctx == null) return null;
 
-        // References
-        Entity a = snap.attacker();
+        KnockbackConfig cfg = snap.config();
+        Cause cause = snap.cause();
+        boolean hasExtra = extra(snap) > 0;
+
         Entity t = snap.target();
-        if (t == null) return Vec.ZERO;
-        Point aPt = snap.attackerPos() != null ? snap.attackerPos() : (a != null ? a.getPosition() : t.getPosition());
-        Point vPt = snap.targetPos() != null ? snap.targetPos() : t.getPosition();
-        Pos aPos = a != null ? a.getPosition() : (aPt instanceof Pos p ? p : new Pos(aPt.x(), aPt.y(), aPt.z()));
+        Point oPt = ctx.oPt();
+        Point tPt = t.getPosition();
+        Vec dir3D = ctx.dir();
 
         // Direction
-        Vec dDirH = deltaH(aPt, vPt);
-        Vec yDirH = yawDir(aPos);
-        Vec dDirV = deltaV(aPt, vPt);
-        Vec pDirV = pitchDir(aPos);
+        Vec dDirH = deltaH(oPt, tPt);
+        Vec yDirH = yawDir(dir3D);
+        Vec dDirV = deltaV(oPt, tPt);
+        Vec pDirV = pitchDir(dir3D);
 
         RawDirs raw = new RawDirs(dDirH, dDirV, yDirH, pDirV);
-        DirAndStrength norm = resolveDS(raw, cfg, false);
-        DirAndStrength extra = hasExtra ? resolveDS(raw, cfg, true) :  null;
+        DirAndStrength normKb = resolveDS(raw, cfg, false);
+        DirAndStrength extraKb = hasExtra ? resolveDS(raw, cfg, true) :  null;
 
         // Strength
-        Vec kb = norm.direction().mul(norm.h(), norm.v(), norm.h());
-        Vec kbe = extra != null ? extra.direction().mul(extra.h(), extra.v(), extra.h()) : null;
-
+        Vec kb = normKb.direction().mul(normKb.h(), normKb.v(), normKb.h());
+        Vec kbe = extraKb != null ? extraKb.direction().mul(extraKb.h(), extraKb.v(), extraKb.h()) : null;
 
         // Normal KB
-        kb = applyRr(kb, aPt, vPt, cfg, false);         // Range Reduction
+        kb = applyRr(kb, oPt, tPt, cfg, false);         // Range Reduction
         kb = applyAMult(kb, t, cfg, false);             // Air Multiplier
         kb = applySweeping(kb, cause, cfg, false);      // Modifiers
 
         // Extra KB
         if (kbe != null) {
-            kbe = applyRr(kbe, aPt, vPt, cfg, true);    // Range Reduction
+            kbe = applyRr(kbe, oPt, tPt, cfg, true);    // Range Reduction
             kbe = applyAMult(kbe, t, cfg, true);        // Air Multiplier
             kbe = applySweeping(kbe, cause, cfg, true); // Modifiers
         }
@@ -80,6 +88,39 @@ public final class KnockbackCalculator {
 
         return kbVec;
     }
+
+    /** Resolves "extra" knockback involved in knockback event. */
+    private int extra(KnockbackSnapshot snap) {
+        int extra = 0;
+
+        // Only melee causes extra (for now) TODO: add handling for non-melee extra (e.g. punch bows)
+        if (!snap.cause().isMelee()) return extra;
+
+        Entity a = snap.source();
+        if (a == null) return extra;
+
+        if (SprintTracker.isSprinting(services.sprintTracker(), a, snap.config().sprintBuffer)) extra++;
+        return extra;
+    }
+
+    /** Gets the direction context for this knockback. */
+    private record DirContext(Point oPt, Vec dir) {}
+
+    private @Nullable DirContext dirCtx(KnockbackSnapshot snap) {
+        Entity t = snap.target();
+        Point tPt = t.getPosition();
+        Entity s = snap.source();
+        Point oPt = snap.origin();
+        Vec dir = snap.direction();
+
+        if (s != null) return new DirContext(s.getPosition(), s.getPosition().direction());
+        if (oPt != null && dir == null) return new DirContext(oPt, new Pos(oPt).withLookAt(tPt).direction());
+        if (dir != null) {
+            Point pt = oPt != null ? oPt : tPt;
+            return new DirContext(pt, new Pos(pt).withDirection(dir).direction());
+        } return null;
+    }
+
 
     /** Direction + horizontal/vertical strengths */
     private record DirAndStrength(Vec direction, double h, double v) {}
@@ -172,38 +213,38 @@ public final class KnockbackCalculator {
         return new Vec(resX, resY, resZ);
     }
 
+    private static final Vec UP = new Vec(0, 1, 0);
+
     /** Horizontal (xz) direction from attacker to victim. Null if degenerate. */
-    private static Vec deltaH(Point aPt, Point vPt) {
-        double dx = vPt.x() - aPt.x();
-        double dz = vPt.z() - aPt.z();
+    private static Vec deltaH(Point sPt, Point tPt) {
+        double dx = tPt.x() - sPt.x();
+        double dz = tPt.z() - sPt.z();
         double dist = Math.sqrt(dx * dx + dz * dz);
         if (dist < MIN_DIST) return ranDirH();
         return new Vec(dx / dist, 0, dz / dist);
     }
 
-    /** Vertical unit direction from height delta (is the victim above or below the attacker */
-    private static Vec deltaV(Point aPt, Point vPt) {
-        double dy = vPt.y() - aPt.y();
-        if (Math.abs(dy) < MIN_DIST) return new Vec(0,1,0); // defaults to up
+    /** Vertical unit direction from height delta (is the victim above or below the attacker. */
+    private static Vec deltaV(Point sPt, Point tPt) {
+        double dy = tPt.y() - sPt.y();
+        if (Math.abs(dy) < MIN_DIST) return UP; // defaults to up
         return new Vec(0, Math.signum(dy), 0);
     }
 
-    /** Horizontal direction from attacker yaw */
-    private static Vec yawDir(Pos aPos) {
-        Vec yaw = aPos.direction();
-        double len = Math.sqrt(yaw.x() * yaw.x() + yaw.z() * yaw.z());
+    /** Vertical unit direction from 3D unit vector (determines up / down). */
+    private static Vec pitchDir(Vec dir) {
+        if (Math.abs(dir.y()) < MIN_DIST) return UP;
+        return new Vec(0, Math.signum(dir.y()), 0);
+    }
+
+    /** Horizontal direction from 3D unit vector. */
+    private static Vec yawDir(Vec dir) {
+        double len = Math.sqrt(dir.x() * dir.x() + dir.z() * dir.z());
         if (len < MIN_DIST) return ranDirH();
-        return new Vec(yaw.x() / len, 0, yaw.z() / len);
+        return new Vec(dir.x() / len, 0, dir.z() / len);
     }
 
-    /** Vertical unit direction from pitch (determines up / down) */
-    private static Vec pitchDir(Pos aPos) {
-        double y = aPos.direction().y();
-        if (Math.abs(y) < MIN_DIST) return new Vec (0,1,0);
-        return new Vec(0, Math.signum(y), 0);
-    }
-
-    /** Returns a random horizontal (xz) vector. */
+    /** Returns a random horizontal vector. */
     private static Vec ranDirH() {
         Vec v;
         do {
@@ -213,8 +254,6 @@ public final class KnockbackCalculator {
         } while (v.length() < MIN_DIST);
         return v.normalize();
     }
-
-    private static final Vec UP = new Vec(0, 1, 0);
 
     /** Weighted blend of two vectors. Uses fallback when sum is degenerate. */
     private static Vec blend(Vec a, Vec b, double wA, double wB, Supplier<Vec> ranDir) {
@@ -263,8 +302,8 @@ public final class KnockbackCalculator {
     }
 
     /** Reduces knockback for sweeping attacks */
-    private Vec applySweeping(Vec kb, KnockbackEvent.Cause cause, KnockbackConfig cfg, boolean hasExtra) {
-        if (cause != KnockbackEvent.Cause.SWEEPING) return kb;
+    private Vec applySweeping(Vec kb, Cause cause, KnockbackConfig cfg, boolean hasExtra) {
+        if (cause != Cause.SWEEPING) return kb;
 
         double sfh = hasExtra ? cfg.sweepFactorExtraH : cfg.sweepFactorH;
         double sfv = hasExtra ? cfg.sweepFactorExtraV : cfg.sweepFactorV;

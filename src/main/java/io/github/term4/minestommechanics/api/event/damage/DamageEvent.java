@@ -5,25 +5,25 @@ import net.minestom.server.entity.Entity;
 import net.minestom.server.entity.damage.DamageType;
 import net.minestom.server.event.Event;
 import net.minestom.server.registry.RegistryKey;
+import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 // TODO: JavaDocs
+// This is the public facing API users can hook into to get information or change how a damage event happens
 public final class DamageEvent implements Event {
 
-    // This is the public facing API users can hook into to get information or change how a damage event happens
-
     private final Entity target;
-    private final RegistryKey<DamageType> type;
+    private final RegistryKey<@NotNull DamageType> type;
     private @Nullable Entity source;
-    private boolean invulnerable;
-    private int remainingInvul;
+    private final boolean invulnerable;
+    private final int remainingInvul;
     private boolean bypassInvul;
     private DamageConfig config;
 
     private float amount;
     private boolean cancelled;
 
-    public DamageEvent(Entity target, RegistryKey<DamageType> type, @Nullable Entity source, Float amount, boolean  invulnerable, int remainingInvul, DamageConfig config) {
+    public DamageEvent(Entity target, RegistryKey<@NotNull DamageType> type, @Nullable Entity source, Float amount, boolean  invulnerable, int remainingInvul, DamageConfig config) {
         this.target = target;
         this.type = type;
         this.source = source;
@@ -34,7 +34,7 @@ public final class DamageEvent implements Event {
     }
 
     public Entity target() { return target; }
-    public RegistryKey<DamageType> type() { return type; }
+    public RegistryKey<@NotNull DamageType> type() { return type; }
 
     public @Nullable Entity source() { return source; }
     public void source(@Nullable Entity source) { this.source = source; }

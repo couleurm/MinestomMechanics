@@ -4,6 +4,7 @@ import net.minestom.server.event.EventFilter;
 import net.minestom.server.event.EventNode;
 import net.minestom.server.event.player.PlayerPluginMessageEvent;
 import net.minestom.server.event.trait.PlayerEvent;
+import org.jetbrains.annotations.NotNull;
 
 import java.nio.charset.StandardCharsets;
 
@@ -20,8 +21,8 @@ public final class VersionDetector {
 
     private VersionDetector() {}
 
-    public static EventNode<PlayerEvent> node(ClientInfoService clientInfo) {
-        EventNode<PlayerEvent> node = EventNode.type("mm:via-proxy-details", EventFilter.PLAYER);
+    public static EventNode<@NotNull PlayerEvent> node(ClientInfoService clientInfo) {
+        EventNode<@NotNull PlayerEvent> node = EventNode.type("mm:via-proxy-details", EventFilter.PLAYER);
 
         node.addListener(PlayerPluginMessageEvent.class, e -> {
             if (!VIA_PROXY_DETAILS_CHANNEL.equals(e.getIdentifier())) return;

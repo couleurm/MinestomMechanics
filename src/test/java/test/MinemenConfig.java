@@ -1,4 +1,4 @@
-package dev.term4;
+package test;
 
 import io.github.term4.minestommechanics.mechanics.knockback.KnockbackConfig;
 
