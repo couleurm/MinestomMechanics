@@ -1,5 +1,6 @@
 package io.github.term4.minestommechanics;
 
+import io.github.term4.minestommechanics.compatibility.proxy.ProxyPlayer;
 import io.github.term4.minestommechanics.mechanics.attack.AttackSystem;
 import io.github.term4.minestommechanics.mechanics.damage.DamageSystem;
 import io.github.term4.minestommechanics.mechanics.knockback.KnockbackSystem;
@@ -67,6 +68,10 @@ public final class MinestomMechanics {
         // Enable always-necessary functions
         TickClock.start();
         VelocityEstimator.install(root);
+
+        if (metaFix) {
+            MinecraftServer.getConnectionManager().setPlayerProvider(ProxyPlayer::new);
+        }
 
         if (installSprintTracker) {
             var tracker = new SprintTracker();
