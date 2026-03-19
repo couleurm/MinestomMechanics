@@ -45,14 +45,11 @@ mavenPublishing {
     }
 }
 
-repositories {
-    mavenCentral()
-}
-
 dependencies {
     val minestomVersion = "2026.02.19-1.21.11"
     val junitVersion = "6.0.3"
 
+    implementation("com.github.Term4:minestom-echo-fix:v0.1.1")
     compileOnly("net.minestom:minestom:$minestomVersion")
     api("io.github.term4:minestom-echo-fix:1.0.0")
 
